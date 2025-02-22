@@ -17,15 +17,39 @@ test('test', async ({ page }) => {
     await page.getByRole('combobox', { name: 'Chercher par intitulé de' }).fill('Développeur');
     await page.keyboard.press('Enter');
     await page.getByRole('radio', { name: 'Filtre Candidature simplifiée.' }).click();
-    page.waitForLoadState('networkidle');
-    // Sélectionner la div en utilisant sa position dans la hiérarchie
-    const targetDiv = await page.locator('div.scaffold-layout__list + div');
+    
+    // Select div
+    const listContainer = page.locator('div.scaffold-layout__list-detail-container');
 
-    // Attendre que l'élément soit visible
-    await targetDiv.waitFor();
+    // Wait for the container to be present in the DOM
+    await listContainer.waitFor();
 
-    // Scroller au maximum vers le bas
-    await targetDiv.evaluate((div) => {
-        div.scrollTo(0, div.scrollHeight);
-    });
+    // Click on the first <li> element to ensure focus
+    const firstItem = await listContainer.locator('li').first();
+    if (await firstItem.isVisible()) {
+        await firstItem.click();
+        console.log("Clicked on the first item.");
+    }
+
+    // Scroll down to load more elements
+    let prevCount = 0;
+    let reachedBottom = false;
+
+    while (!reachedBottom) {
+        const allItems = await listContainer.locator('li').all();
+        const currentCount = allItems.length;
+
+        if (currentCount > prevCount) {
+            prevCount = currentCount;
+            console.log(`Loaded ${currentCount} items, scrolling down...`);
+        } else {
+            reachedBottom = true;
+        }
+
+        // Scroll step by step
+        await listContainer.evaluate((div) => div.scrollBy(0, 300));
+        await page.waitForTimeout(500); // Wait for new items to load
+    }
+
+    console.log(`Final count of visible items: ${prevCount}`);
 });
