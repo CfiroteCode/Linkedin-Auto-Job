@@ -1,0 +1,65 @@
+Michael LOISON
+DEVELOPPEUR FULLLSTACK et Testeur automaticien QA
+
+Testeur et développeur passionné par l'informatique. J'ai contribué à divers projets, de la création d'applications B2B à des solutions interactives. Passionné et adaptable, je m'efforce d'améliorer continuellement la qualité du code et la performance des systèmes.
+
+mail : cfirote@gmail.com
+adresse : 5 Allée Léonard De Vinci Appartement 45 59000 Lille
+date de naissance :Né le 10/04/1986
+origine : Français
+Permis B
+Véhicule personnel
+deplacement possible : Nord, Paris, Belgique
+telephone : 06 52 52 00 65
+
+Connaissances : 
+Logiciels: Unity 3d, Code VS, Visual Code, Git, Xcode
+Langages : C#, Javascript, Python, SQL, HTLM, CSS
+Frameworks : .Net Framework, Angular,WPF
+Plateformes : Windows, Android, UWP
+Technologies : AR, VR, MR, modélisation 3D (low poly), impression 3D
+
+Expériences professionnelles : 
+Developpeur c# .NET De juin 2020 à août 2020 (2 mois)
+Delssi, Hem
+Creation d'application pour gérer les stocks/inventaires à l'aide de douchette
+scanner pour un ajout/retrait ou edition dans les stocks
+Logiciel : Visual Studio Code // Techno : C# .Net et SQL
+Developpeur C# .net WPF/UWP De septembre 2019 à février 2020 (5 mois)
+Taktus, Lille
+Développement d'applications qui permettent d'afficher des informations de
+produit comme sur le site internet pour conserver la charte graphique via le
+scan d'une puce RFID.
+Logiciel : Visual Studio // Techno : C# >.Net et SQL
+Développeur freelance C# .NET D'août 2018 à août 2019 (1 an)
+Autoentrepreuneur, Lille
+Plusieurs mission pour les société : principalement pour des application VR pour
+casque Oculus Go
+Logiciel : Unity 3D // Language : C# .Net
+Lead Developpeur et responsable SAV De juin 2015 à janvier 2018 (2 ans+)
+Homido, Lille
+Responsable du SAV et assistance des produit de réalité virtuel mobile, et
+développement de démos pour salon et/ou pour faire une veille de
+l'avancement de la technologie VR Mobile. (Unity 3D pour smartphone)
+Logiciel : Unity 3D, XCode // Language : C# .Net
+
+Autres expérience professionnelles :
+Operateur support technique système De mai 2021 à octobre 2024 (3 ans+)
+d'alarme
+Euro Protection Surveillance, Verlinghem
+Technicien téléphonique Expert De janvier 2010 à juin 2015 (5 ans+)
+Multimédia
+Clictel, Tourcoing
+technicien téléphonique De septembre 2009 à janvier 2010 (4 mois)
+Multimédia
+Boulanger, Lille
+
+Diplômes et Formations :
+POEC Testeur logiciel EPSI (mars 2025)
+Certification Foundational C# with Microsoft (Octobre 2024)
+POEC Developpeur web fullstack chez Aston (mai à aout 2018)
+Agent de maintenance informatique ILEP (avril à septembre 2009)
+
+Centres d'intérêt :
+Informatique en générale (matériel et logiciel)
+Projets DIY informatique/électronique
