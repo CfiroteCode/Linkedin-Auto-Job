@@ -1,4 +1,4 @@
-import { test } from '@playwright/test';
+import { Locator, test } from '@playwright/test';
 import dotenv from 'dotenv';
 import config from '../config.js';
 dotenv.config({ path: './.env' });
@@ -86,7 +86,7 @@ test('test', async ({ page }) => {
                 await page.waitForTimeout(2000);
 
                 const modal = page.locator('div.jobs-easy-apply-modal__content');
-                
+
                 // Check if the <h2> with id "post-apply-modal" exists and contains "Candidature envoyée"
                 const confirmationText = page.locator('h2#post-apply-modal');
 
@@ -98,7 +98,7 @@ test('test', async ({ page }) => {
                         const ignoreButton = page.getByRole('button', { name: 'Ignorer', exact: true });
                         await ignoreButton.click();
                         break;
-                    } 
+                    }
                 }
 
 
@@ -127,8 +127,13 @@ test('test', async ({ page }) => {
                     } else if (type === 'checkbox') {
                         const isChecked = await input.isChecked(); // Check if already checked
                         if (!isChecked) {
-                            console.log("Checking the checkbox...");
-                            await input.check(); // Check the checkbox
+                            const tryCheck = 3
+                            let check = 0
+                            while (check < tryCheck) {
+                                console.log("Checking the checkbox...");
+                                await input.check(); // Check the checkbox
+                                check++;
+                            }
                         } else {
                             console.log("Checkbox is already checked.");
                         }
@@ -155,7 +160,88 @@ test('test', async ({ page }) => {
                     }
                 }
 
-                if (emptyInputs.length == 0) {
+                // Get all input fields inside the modal
+                const inputContainers = await modal.locator('div[data-test-single-line-text-form-component]').all();
+
+                // Store the list of input fields with error messages
+                const errorInputs: { question: string; errorMessage: string; inputContainer: Locator }[] = [];
+
+                for (const container of inputContainers) {
+                    const labelElement = container.locator('label');
+                    const inputElement = container.locator('input');
+                    const spanElement = container.locator('span.artdeco-inline-feedback__message');
+
+                    // Ensure all required elements exist
+                    if (await labelElement.isVisible() && await inputElement.isVisible() && await spanElement.isVisible()) {
+                        const question = (await labelElement.innerText()).trim();
+                        const errorMessage = (await spanElement.innerText()).trim();
+
+                        errorInputs.push({ question, errorMessage, inputContainer: container });
+                    }
+                }
+
+                console.log("🚀 List of input fields with error messages:");
+                console.log(errorInputs);
+
+                // Loop through errorInputs
+                for (const { question, errorMessage, inputContainer } of errorInputs) {
+                    const gptPrompt = question + " " + errorMessage;
+                    const answer = await getAnswerFromPython(gptPrompt); // Await properly inside loop
+
+                    console.log(`Generated answer: ${answer}`);
+
+                    // Fill the input field with the answer
+                    await inputContainer.locator('input').fill(answer);
+                }
+
+                // Get all <select> elements
+                const selectFields = await modal.locator('select').all();
+
+                // Store selects that need to be answered
+                const unansweredSelects: any[] = [];
+
+                // Store available options for each select (excluding the first one)
+                const selectOptions: Record<string, string[]> = {};
+
+                for (const select of selectFields) {
+                    const options = await select.locator('option').allTextContents(); // Get all options text
+                    const firstOption = (await select.locator('option').first().textContent())?.trim() || "";
+                    const selectedOption = await select.inputValue(); // Get the currently selected value
+                    const parent_locator = select.locator('..');
+                    const labelElement = parent_locator.locator('label');
+
+                    // If the selected option is the first option, it needs to be answered
+                    if (selectedOption === firstOption) {
+                        unansweredSelects.push(select);
+
+                        // Store all options except the first one (trimmed)
+                        const selectOptions = options.slice(1).map(opt => opt.trim()); // Remove first option
+                        let availableOptions = '';
+
+                        selectOptions.forEach(opt => {
+                            // Assuming opt is a string or can be converted to a string
+                            availableOptions += opt.toString() + ' || ';
+                        });
+
+                        // Optionally, you can trim the last ' || ' if needed
+                        availableOptions = availableOptions.slice(0, -4); // Remove the last ' || '
+
+                        const gptPrompt = labelElement + " the only answer available are :" + availableOptions;
+                        const answer = await getAnswerFromPython(gptPrompt); // Await properly inside loop
+
+                        console.log(`Generated answer: ${answer}`);
+
+                        // Fill the select field with the answer
+                        await select.selectOption({ label: answer.trim() });
+
+                    }
+
+                }
+
+                console.log(`Unanswered selects: ${unansweredSelects.length}`);
+                console.log("Available select options (excluding first):", selectOptions);
+
+                if (emptyInputs.length == 0 && unansweredSelects.length == 0) {
                     if (nextStepButton) nextStepButton.click();
                     if (submitButton) submitButton.click();
                     if (verifButton) verifButton.click();
@@ -210,7 +296,7 @@ async function getInputValueWithTimeout(input: Locator, timeoutMs: number): Prom
 
 // Function to call the Python script and get the answer
 async function getAnswerFromPython(question: string): Promise<string> {
-    const prompt = `avec le CV ci-joint, ne donne QUE la réponse a cette question, un chiffre si c'est ce qui est demqndé ou une reponse courte: ${question}`;
+    const prompt = `avec le CV ci-joint, ne donne QUE la réponse a cette question, un chiffre si c'est ce qui est demandé ou une reponse courte: ${question}`;
 
     try {
         const pythonProcess = spawn('python', ['gpt4free.py', prompt]);
