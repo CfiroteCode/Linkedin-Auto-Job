@@ -12,9 +12,9 @@ test('test', async ({ page }) => {
     await page.getByRole('textbox', { name: 'Password' }).fill(process.env.LINKEDIN_PASSWORD);
     await page.getByRole('button', { name: 'Sign in', exact: true }).click();
     await page.getByRole('link', { name: 'Emplois' }).click();
-    await page.getByRole('combobox', { name: 'Chercher par intitulé de' }).fill('Développeur');
+    await page.getByRole('combobox', { name: 'Chercher par intitulé de' }).fill(process.env.JOB_SEARCH_KEYWORD);
     await page.keyboard.press('Enter');
-    await page.getByRole('combobox', { name: 'Ville, département ou code' }).fill('Nord, Hauts-de-France, France');
+    await page.getByRole('combobox', { name: 'Ville, département ou code' }).fill(process.env.LOCATION);
     await page.keyboard.press('Enter');
     await page.getByRole('radio', { name: 'Filtre Candidature simplifiée.' }).click();
 
@@ -63,8 +63,6 @@ test('test', async ({ page }) => {
         await page.waitForTimeout(2000);
 
 
-
-
         // Locate the "Candidature simplifiée" button
         const easyApplyButton = await page.$(config.SELECTORS.APPLICATION.EASY_APPLY);
 
@@ -92,7 +90,7 @@ test('test', async ({ page }) => {
 
                 if (await confirmationText.isVisible()) {
                     const textContent = await confirmationText.innerText();
-                    if (textContent.includes("Candidature envoyée")) {
+                    if (textContent.includes("Candidature envoy")) {
                         console.log("✅ Candidature envoyée confirmation detected!");
 
                         const ignoreButton = page.getByRole('button', { name: 'Ignorer', exact: true });
@@ -131,7 +129,8 @@ test('test', async ({ page }) => {
                             let check = 0
                             while (check < tryCheck) {
                                 console.log("Checking the checkbox...");
-                                await input.check(); // Check the checkbox
+                                // await input.check(); // Check the checkbox
+                                await input.dispatchEvent("click");
                                 check++;
                             }
                         } else {
@@ -266,9 +265,6 @@ test('test', async ({ page }) => {
                 tryCount++;
             }
 
-
-
-            // aria-label="Passez à l’étape suivante" // aria-label="Envoyer la candidature"
 
         } else {
             console.log("No 'Candidature simplifiée' button found.");

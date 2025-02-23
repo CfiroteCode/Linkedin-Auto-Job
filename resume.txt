@@ -4,7 +4,7 @@ DEVELOPPEUR FULLLSTACK et Testeur automaticien QA
 Testeur et développeur passionné par l'informatique. J'ai contribué à divers projets, de la création d'applications B2B à des solutions interactives. Passionné et adaptable, je m'efforce d'améliorer continuellement la qualité du code et la performance des systèmes.
 
 mail : cfirote@gmail.com
-adresse : 5 Allée Léonard De Vinci Appartement 45 59000 Lille
+adresse : 5 Allée Léonard De Vinci Appartement 45 59000 Lille, region Lilloise
 date de naissance :Né le 10/04/1986
 origine : Français
 Permis B
@@ -18,6 +18,7 @@ Langages : C#, Javascript, Python, SQL, HTLM, CSS
 Frameworks : .Net Framework, Angular,WPF
 Plateformes : Windows, Android, UWP
 Technologies : AR, VR, MR, modélisation 3D (low poly), impression 3D
+environ 4 ans d'experiences pour chaques language.
 
 Expériences professionnelles : 
 Developpeur c# .NET De juin 2020 à août 2020 (2 mois)

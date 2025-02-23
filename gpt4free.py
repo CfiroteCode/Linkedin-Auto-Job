@@ -12,7 +12,7 @@ prompt= question + " // mon CV : " + file_content
 
 client = Client()
 response = client.chat.completions.create(
-    model="gemini-2.0-flash",
+    model="gpt-4o",
     messages=[{"role": "user", "content": prompt}],
     web_search=False
 )
