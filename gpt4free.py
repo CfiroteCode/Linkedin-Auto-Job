@@ -1,5 +1,9 @@
 from g4f.client import Client
 import sys
+import asyncio
+
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 question = sys.argv[1]
 file_path = 'resume.txt'
@@ -12,7 +16,7 @@ prompt= question + " // mon CV : " + file_content
 
 client = Client()
 response = client.chat.completions.create(
-    model="gpt-4o",
+    model="gpt-4",
     messages=[{"role": "user", "content": prompt}],
     web_search=False
 )

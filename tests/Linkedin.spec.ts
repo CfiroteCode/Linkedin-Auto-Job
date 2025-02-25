@@ -77,20 +77,22 @@ test('test', async ({ page }) => {
             let binaryInputs = [];
 
 
-            let maxTries = 50; // Prevent infinite loops
+            let maxTries = 25; // Prevent infinite loops, and there is maximum 25 jobs by pages
             let tryCount = 0;
 
             while (tryCount < maxTries) {
                 await page.waitForTimeout(2000);
 
                 const modal = page.locator('div.jobs-easy-apply-modal__content');
+                await modal.waitFor();
 
                 // Check if the <h2> with id "post-apply-modal" exists and contains "Candidature envoyée"
-                const confirmationText = page.locator('h2#post-apply-modal');
+                const confirmationText = await page.locator('h2#post-apply-modal');
 
+                //if it existe, close the modal
                 if (await confirmationText.isVisible()) {
                     const textContent = await confirmationText.innerText();
-                    if (textContent.includes("Candidature envoy")) {
+                    if (textContent.includes("Candidature envoyée")) {
                         console.log("✅ Candidature envoyée confirmation detected!");
 
                         const ignoreButton = page.getByRole('button', { name: 'Ignorer', exact: true });
@@ -100,7 +102,6 @@ test('test', async ({ page }) => {
                 }
 
 
-                await modal.waitFor();
                 const nextStepButton = modal.getByLabel('Passez à l’étape suivante', { exact: true });
                 const submitButton = modal.getByLabel('Envoyer la candidature', { exact: true });
                 const verifButton = modal.getByLabel('Vérifiez votre candidature', { exact: true });
@@ -111,7 +112,7 @@ test('test', async ({ page }) => {
                     break;
                 }
 
-                // Select all input fields inside the modal
+                // Select all inputs fields inside the modal
                 const inputFields = await modal.locator('input').all();
 
                 // Filter empty input fields
@@ -129,7 +130,6 @@ test('test', async ({ page }) => {
                             let check = 0
                             while (check < tryCheck) {
                                 console.log("Checking the checkbox...");
-                                // await input.check(); // Check the checkbox
                                 await input.dispatchEvent("click");
                                 check++;
                             }
@@ -139,7 +139,7 @@ test('test', async ({ page }) => {
                     }
                 }
 
-                console.log(`Found ${emptyInputs.length} empty inputs.`);
+                console.log(`Found ${emptyInputs.length} empty inputs Texte.`);
 
                 for (const input of emptyInputs) {
                     console.log(input);
@@ -193,6 +193,24 @@ test('test', async ({ page }) => {
                     await inputContainer.locator('input').fill(answer);
                 }
 
+                // Find all fieldsets with radio buttons
+                const fieldsets = await modal.locator('fieldset[data-test-form-builder-radio-button-form-component="true"]').all();
+
+                for (const fieldset of fieldsets) {
+                    const yesOption = fieldset.locator(
+                        'input[type="radio"][value="Yes"], input[type="radio"][value="Oui"], ' +
+                        'input[data-test-text-selectable-option__input="Yes"], input[data-test-text-selectable-option__input="Oui"]'
+                    );
+
+                    if (await yesOption.isVisible()) {
+                        console.log("✅ Clicking 'Yes' option...");
+                        // await yesOption.check();
+                        await yesOption.dispatchEvent("click"); // Selects the "Yes" radio button
+                    } else {
+                        console.log("❌ 'Yes' option not found.");
+                    }
+                }
+
                 // Get all <select> elements
                 const selectFields = await modal.locator('select').all();
 
@@ -203,11 +221,22 @@ test('test', async ({ page }) => {
                 const selectOptions: Record<string, string[]> = {};
 
                 for (const select of selectFields) {
+                    const selectId = await select.getAttribute('id');
+                    if (!selectId) continue; // Skip if no ID found
                     const options = await select.locator('option').allTextContents(); // Get all options text
                     const firstOption = (await select.locator('option').first().textContent())?.trim() || "";
                     const selectedOption = await select.inputValue(); // Get the currently selected value
-                    const parent_locator = select.locator('..');
-                    const labelElement = parent_locator.locator('label');
+
+                    const labelLocator = page.locator(`label[for="${selectId}"]`);
+
+                    let question = '';
+                    if (await labelLocator.isVisible()) {
+                        // Extract the question text
+                        question = (await labelLocator.innerText()).trim();
+                        console.log(`❓ Question: ${question}`);
+                    } else {
+                        console.log(`❌ No label found for select with ID: ${selectId}`);
+                    }
 
                     // If the selected option is the first option, it needs to be answered
                     if (selectedOption === firstOption) {
@@ -225,13 +254,17 @@ test('test', async ({ page }) => {
                         // Optionally, you can trim the last ' || ' if needed
                         availableOptions = availableOptions.slice(0, -4); // Remove the last ' || '
 
-                        const gptPrompt = labelElement + " the only answer available are :" + availableOptions;
-                        const answer = await getAnswerFromPython(gptPrompt); // Await properly inside loop
+                        const gptPrompt = question + " the only answer available are :" + availableOptions;
+                        console.log(`Gpt Prompt: ` + encodeURIComponent(gptPrompt));
 
-                        console.log(`Generated answer: ${answer}`);
+                        let answer = await getAnswerFromPython(decodeURIComponent(gptPrompt)); // Await properly inside loop
+                        // answer = answer.slice(0, -5).trim().normalize("NFC");
 
-                        // Fill the select field with the answer
-                        await select.selectOption({ label: answer.trim() });
+                        // Find the best matching option
+                        const matchingOption = await findClosestMatch(answer, selectOptions);
+                        await select.selectOption({ label: matchingOption });
+
+                        console.log(`Generated Select answer test: ` + matchingOption);
 
                     }
 
@@ -327,4 +360,24 @@ async function getAnswerFromPython(question: string): Promise<string> {
         console.error("GPT Error:", error);
         return "An error occurred while processing your request.";
     }
+}
+
+// Function to find the closest matching option
+function findClosestMatch(answer: string, options: string[]): string | undefined {
+    // Normalize text by removing accents, extra spaces, and special characters
+    const normalizeText = (text: string) =>
+        text
+            .normalize("NFD") // Decomposes characters (é -> é)
+            .replace(/[\u0300-\u036f]/g, "") // Removes accents
+            .replace(/[^\w\s]/g, "") // Removes non-word characters (e.g., special chars like �)
+            .trim()
+            .toLowerCase();
+
+    // Clean answer
+    const normalizedAnswer = normalizeText(answer);
+
+    console.log(`🔍 Normalized answer: ${normalizedAnswer}`);
+
+    // Find best matching option
+    return options.find(option => normalizeText(option).includes(normalizedAnswer));
 }
