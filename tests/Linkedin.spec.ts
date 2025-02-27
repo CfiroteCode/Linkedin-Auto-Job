@@ -1,6 +1,7 @@
 import { Locator, test } from '@playwright/test';
 import dotenv from 'dotenv';
 import config from '../config.js';
+import GetAnswer from '../utils/GetAnswerFromPython.ts';
 dotenv.config({ path: './.env' });
 import { spawn } from 'child_process';
 
@@ -10,14 +11,31 @@ test('test', async ({ page }) => {
     await page.getByRole('textbox', { name: 'Email or phone' }).fill(process.env.LINKEDIN_EMAIL);
     await page.getByRole('textbox', { name: 'Password' }).click();
     await page.getByRole('textbox', { name: 'Password' }).fill(process.env.LINKEDIN_PASSWORD);
+    await page.getByText('Keep me logged in').click();
     await page.getByRole('button', { name: 'Sign in', exact: true }).click();
     await page.getByRole('link', { name: 'Emplois' }).click();
-    await page.getByRole('combobox', { name: 'Chercher par intitulé de' }).fill(process.env.JOB_SEARCH_KEYWORD);
+    await page.getByRole('combobox', { name: 'Chercher par intitulé de' }).fill(config.JOBPARAMETERS.JOB_SEARCH_KEYWORD);
     await page.keyboard.press('Enter');
-    await page.getByRole('combobox', { name: 'Ville, département ou code' }).fill(process.env.LOCATION);
+    await page.getByRole('combobox', { name: 'Ville, département ou code' }).fill(config.JOBPARAMETERS.LOCATION);
     await page.keyboard.press('Enter');
-    await page.getByRole('radio', { name: 'Filtre Candidature simplifiée.' }).click();
 
+    //add the filter 'Candidature simplifiée'
+    const newParam = '&f_AL=true';
+    await page.evaluate((param) => {
+        const newUrl = new URL(window.location.href);
+
+        // Check if the parameter already exists to avoid duplicates
+        if (!newUrl.search.includes(param)) {
+            newUrl.search += param;
+            window.location.href = newUrl.toString(); // Reload the page with the new URL
+        }
+    }, newParam);
+
+    // Wait for the page to reload
+    await page.waitForLoadState('load');
+    await page.waitForTimeout(5000);
+
+    // await page.goto(newUrl.toString());// Change the URL to add filter Candidature simplifiée.
     // Select div
     const listContainer = page.locator('div.scaffold-layout__list-detail-container');
 
@@ -71,23 +89,17 @@ test('test', async ({ page }) => {
             await page.$('button.jobs-apply-button');
             await easyApplyButton.click();
 
-            //take all empty form inputs
-            let numericInputs = [];
-            let textInputs = [];
-            let binaryInputs = [];
-
-
             let maxTries = 25; // Prevent infinite loops, and there is maximum 25 jobs by pages
             let tryCount = 0;
 
             while (tryCount < maxTries) {
                 await page.waitForTimeout(2000);
 
-                const modal = page.locator('div.jobs-easy-apply-modal__content');
-                await modal.waitFor();
+                const modal = await page.locator('div.jobs-easy-apply-modal__content');
+                await page.waitForTimeout(1000);
 
-                // Check if the <h2> with id "post-apply-modal" exists and contains "Candidature envoyée"
-                const confirmationText = await page.locator('h2#post-apply-modal');
+                // Check if "Candidature envoyée" exists in the modal
+                const confirmationText = modal.locator('h2', { hasText: 'Candidature envoyée' });
 
                 //if it existe, close the modal
                 if (await confirmationText.isVisible()) {
@@ -151,7 +163,7 @@ test('test', async ({ page }) => {
                         console.log(`Question found: ${question}`);
 
                         // Get the answer from the Python script
-                        const answer = await getAnswerFromPython(question);
+                        const answer = await GetAnswer(question);
                         console.log(`Generated answer: ${answer}`);
 
                         // Fill the input field with the answer
@@ -185,12 +197,27 @@ test('test', async ({ page }) => {
                 // Loop through errorInputs
                 for (const { question, errorMessage, inputContainer } of errorInputs) {
                     const gptPrompt = question + " " + errorMessage;
-                    const answer = await getAnswerFromPython(gptPrompt); // Await properly inside loop
+                    const answer = await GetAnswer(gptPrompt); // Await properly inside loop
 
                     console.log(`Generated answer: ${answer}`);
 
                     // Fill the input field with the answer
                     await inputContainer.locator('input').fill(answer);
+                }
+
+                const textareaInputs = await page.locator('textarea').all();
+                for (const textarea of textareaInputs) {
+                    const value = await getInputValueWithTimeout(textarea, 100);
+                    if (value == '') {
+                        const parentDiv = textarea.locator('xpath=..'); // Go to parent
+                        const label = parentDiv.locator('label'); // Find label inside the parent
+                        const question = await label.innerText();
+                        const errorMessage = '';
+                        const gptPrompt = question + " " + errorMessage;
+                        console.log(`❓ Gpt Prompt textarea : ${gptPrompt}`);
+                        const answer = await GetAnswer(gptPrompt);
+                        await textarea.fill(answer);
+                    }
                 }
 
                 // Find all fieldsets with radio buttons
@@ -257,7 +284,7 @@ test('test', async ({ page }) => {
                         const gptPrompt = question + " the only answer available are :" + availableOptions;
                         console.log(`Gpt Prompt: ` + encodeURIComponent(gptPrompt));
 
-                        let answer = await getAnswerFromPython(decodeURIComponent(gptPrompt)); // Await properly inside loop
+                        let answer = await GetAnswer(decodeURIComponent(gptPrompt)); // Await properly inside loop
                         // answer = answer.slice(0, -5).trim().normalize("NFC");
 
                         // Find the best matching option
@@ -323,44 +350,44 @@ async function getInputValueWithTimeout(input: Locator, timeoutMs: number): Prom
     }
 }
 
-// Function to call the Python script and get the answer
-async function getAnswerFromPython(question: string): Promise<string> {
-    const prompt = `avec le CV ci-joint, ne donne QUE la réponse a cette question, un chiffre si c'est ce qui est demandé ou une reponse courte: ${question}`;
+// // Function to call the Python script and get the answer
+// async function GetAnswer(question: string): Promise<string> {
+//     const prompt = `avec le CV ci-joint, ne donne QUE la réponse a cette question, un chiffre si c'est ce qui est demandé ou une reponse courte: ${question}`;
 
-    try {
-        const pythonProcess = spawn('python', ['gpt4free.py', prompt]);
+//     try {
+//         const pythonProcess = spawn('python', ['gpt4free.py', prompt]);
 
-        let response = '';
+//         let response = '';
 
-        // Collect data from the Python script
-        pythonProcess.stdout.on('data', (data) => {
-            response += data.toString();
-        });
+//         // Collect data from the Python script
+//         pythonProcess.stdout.on('data', (data) => {
+//             response += data.toString();
+//         });
 
-        // Handle errors from the Python script
-        pythonProcess.stderr.on('data', (data) => {
-            console.error(`Python Error: ${data}`);
-        });
+//         // Handle errors from the Python script
+//         pythonProcess.stderr.on('data', (data) => {
+//             console.error(`Python Error: ${data}`);
+//         });
 
-        // Wait for the Python process to exit
-        await new Promise((resolve, reject) => {
-            pythonProcess.on('close', (code) => {
-                if (code === 0) {
-                    resolve(response);
-                } else {
-                    reject(new Error(`Python process exited with code ${code}`));
-                }
-            });
-        });
+//         // Wait for the Python process to exit
+//         await new Promise((resolve, reject) => {
+//             pythonProcess.on('close', (code) => {
+//                 if (code === 0) {
+//                     resolve(response);
+//                 } else {
+//                     reject(new Error(`Python process exited with code ${code}`));
+//                 }
+//             });
+//         });
 
-        console.log(response);
-        return response;
+//         console.log(response);
+//         return response;
 
-    } catch (error) {
-        console.error("GPT Error:", error);
-        return "An error occurred while processing your request.";
-    }
-}
+//     } catch (error) {
+//         console.error("GPT Error:", error);
+//         return "An error occurred while processing your request.";
+//     }
+// }
 
 // Function to find the closest matching option
 function findClosestMatch(answer: string, options: string[]): string | undefined {

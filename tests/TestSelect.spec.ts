@@ -1,7 +1,8 @@
-import { Locator, test } from '@playwright/test';
+import { test } from '@playwright/test';
 import dotenv from 'dotenv';
 dotenv.config({ path: './.env' });
 import { spawn } from 'child_process';
+import findClosestMatch from '../utils/findClosestMatch.ts';
 
 test('test', async ({ page }) => {
     await page.goto('file:///C:/Users/Michael/Documents/Linkedin%20Job%20AI/Linkedin-Auto-Job/inputsExample/select.html');
@@ -51,7 +52,6 @@ test('test', async ({ page }) => {
             console.log(`Gpt Prompt: ` + encodeURIComponent(gptPrompt));
 
             let answer = await getAnswerFromPython(decodeURIComponent(gptPrompt)); // Await properly inside loop
-            // answer = answer.slice(0, -5).trim().normalize("NFC");
 
             // Find the best matching option
             const matchingOption = await findClosestMatch(answer, selectOptions);
@@ -103,21 +103,21 @@ async function getAnswerFromPython(question: string): Promise<string> {
     }
 }
 // Function to find the closest matching option
-function findClosestMatch(answer: string, options: string[]): string | undefined {
-    // Normalize text by removing accents, extra spaces, and special characters
-    const normalizeText = (text: string) =>
-        text
-            .normalize("NFD") // Decomposes characters (é -> é)
-            .replace(/[\u0300-\u036f]/g, "") // Removes accents
-            .replace(/[^\w\s]/g, "") // Removes non-word characters (e.g., special chars like �)
-            .trim()
-            .toLowerCase();
+// function findClosestMatch(answer: string, options: string[]): string | undefined {
+//     // Normalize text by removing accents, extra spaces, and special characters
+//     const normalizeText = (text: string) =>
+//         text
+//             .normalize("NFD") // Decomposes characters (é -> é)
+//             .replace(/[\u0300-\u036f]/g, "") // Removes accents
+//             .replace(/[^\w\s]/g, "") // Removes non-word characters (e.g., special chars like �)
+//             .trim()
+//             .toLowerCase();
 
-    // Clean answer
-    const normalizedAnswer = normalizeText(answer);
+//     // Clean answer
+//     const normalizedAnswer = normalizeText(answer);
 
-    console.log(`🔍 Normalized answer: ${normalizedAnswer}`);
+//     console.log(`🔍 Normalized answer: ${normalizedAnswer}`);
 
-    // Find best matching option
-    return options.find(option => normalizeText(option).includes(normalizedAnswer));
-}
+//     // Find best matching option
+//     return options.find(option => normalizeText(option).includes(normalizedAnswer));
+// }

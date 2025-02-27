@@ -7,6 +7,9 @@ const config = {
       SUBMIT: 'button[aria-label="Submit application"]',
       DISMISS: 'button[aria-label="Dismiss"]'
     }
+  },JOBPARAMETERS:{
+    LOCATION :"florida",
+    JOB_SEARCH_KEYWORD :"developer"
   }
 };
 module.exports = config;

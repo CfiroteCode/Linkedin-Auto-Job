@@ -2,8 +2,9 @@ import { Locator, test } from '@playwright/test';
 import dotenv from 'dotenv';
 dotenv.config({ path: './.env' });
 import { spawn } from 'child_process';
+import GetAnswer from '../utils/GetAnswerFromPython.ts';
 
-test('test', async ({ page }) => {
+test('Fill all empty text inputs', async ({ page }) => {
     await page.goto('file:///C:/Users/Michael/Documents/Linkedin%20Job%20AI/Linkedin-Auto-Job/inputsExample/textInput.html');
     
 
@@ -37,7 +38,7 @@ test('test', async ({ page }) => {
     for (const { question, errorMessage, inputContainer } of Inputs) {
         const gptPrompt = question + " " + errorMessage;
         console.log(`❓ Gpt Prompt : ${gptPrompt}`);
-        const answer = await getAnswerFromPython(gptPrompt); // Await properly inside loop
+        const answer = await GetAnswer(gptPrompt); // Await properly inside loop
 
         console.log(`Generated answer: ${answer}`);
 
@@ -59,44 +60,5 @@ async function getInputValueWithTimeout(input: Locator, timeoutMs: number): Prom
     } catch (error) {
         console.log(`Skipping input due to timeout (${timeoutMs}ms).`);
         return null;
-    }
-}
-
-// Function to call the Python script and get the answer
-async function getAnswerFromPython(question: string): Promise<string> {
-    const prompt = `avec le CV ci-joint, ne donne QUE la réponse a cette question, un chiffre si c'est ce qui est demandé ou une reponse courte: ${question}`;
-
-    try {
-        const pythonProcess = spawn('python', ['gpt4free.py', prompt]);
-
-        let response = '';
-
-        // Collect data from the Python script
-        pythonProcess.stdout.on('data', (data) => {
-            response += data.toString();
-        });
-
-        // Handle errors from the Python script
-        pythonProcess.stderr.on('data', (data) => {
-            console.error(`Python Error: ${data}`);
-        });
-
-        // Wait for the Python process to exit
-        await new Promise((resolve, reject) => {
-            pythonProcess.on('close', (code) => {
-                if (code === 0) {
-                    resolve(response);
-                } else {
-                    reject(new Error(`Python process exited with code ${code}`));
-                }
-            });
-        });
-
-        console.log(response);
-        return response;
-
-    } catch (error) {
-        console.error("GPT Error:", error);
-        return "An error occurred while processing your request.";
     }
 }
