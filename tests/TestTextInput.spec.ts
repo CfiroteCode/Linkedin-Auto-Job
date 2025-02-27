@@ -23,7 +23,7 @@ test('Fill all empty text inputs', async ({ page }) => {
         const type = await inputElement.getAttribute('type'); // Get input type
 
         // Ensure all required elements exist and they are empty
-        if ((await labelElement.isVisible() && await inputElement.isVisible())&& value == '' && type != 'file') {
+        if ((await labelElement.isVisible() && await inputElement.isVisible())&& (value == '' || (await spanElement.count()) > 0 ) && type != 'file') {
             const question = (await labelElement.innerText()).trim();
             const errorMessage = (await spanElement.count()) > 0 ? (await spanElement.innerText()).trim() : "";
 
