@@ -283,14 +283,15 @@ test('test', async ({ page }) => {
                 }
 
 
-            } else {
-                console.log("No 'Candidature simplifiée' button found.");
             }
+        } else {
+            console.log("No 'Candidature simplifiée' button found.");
         }
+    }
 
-        console.log("Finished processing all jobs.");
+    console.log("Finished processing all jobs.");
 
-    });
+});
 
 // Function with timeout for input.value()
 async function getInputValueWithTimeout(input: Locator, timeoutMs: number): Promise<string | null> {
