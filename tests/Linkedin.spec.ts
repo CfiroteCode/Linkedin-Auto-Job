@@ -94,7 +94,7 @@ test('test', async ({ page }) => {
             let tryCount = 0;
 
             while (tryCount < maxTries) {
-                await page.waitForTimeout(2000);
+                // await page.waitForTimeout(2000);
 
                 const modal = await page.locator('div.jobs-easy-apply-modal__content');
                 await page.waitForTimeout(1000);
