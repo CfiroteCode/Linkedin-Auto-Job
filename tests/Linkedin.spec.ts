@@ -2,6 +2,7 @@ import { Locator, test } from '@playwright/test';
 import dotenv from 'dotenv';
 import config from '../config.js';
 import GetAnswer from '../utils/GetAnswerFromPython.ts';
+import findClosestMatch from '../utils/findClosestMatch.ts';
 dotenv.config({ path: './.env' });
 
 test('test', async ({ page }) => {
@@ -119,14 +120,6 @@ test('test', async ({ page }) => {
                 const submitButton = modal.getByLabel('Envoyer la candidature', { exact: true });
                 const verifButton = modal.getByLabel('Vérifiez votre candidature', { exact: true });
 
-                // Stop the loop when neither button is visible
-                if (!(await nextStepButton.isVisible()) && !(await submitButton.isVisible() && !(await verifButton.isVisible()))) {
-                    console.log("✅ No more steps or submit button, exiting loop.");
-                    const ignoreButton = page.getByRole('button', { name: 'Ignorer', exact: true });
-                    await ignoreButton.click();
-                    break;
-                }
-
                 // Get all <input> elements type text
                 const inputContainers = await modal.locator('div[data-test-single-line-text-form-component]').all();
 
@@ -153,132 +146,180 @@ test('test', async ({ page }) => {
                 console.log("🚀 List of input fields empty or with errors:");
                 console.log(Inputs);
 
-                // Loop through Inputs
+                // Loop through Inputs text to fill
                 for (const { question, errorMessage, inputContainer } of Inputs) {
                     const gptPrompt = question + " " + errorMessage;
-                    console.log(`❓ Gpt Prompt : ${gptPrompt}`);
+                    console.log(`❓ Gpt Prompt text : ${gptPrompt}`);
                     const answer = await GetAnswer(gptPrompt); // Await properly inside loop
 
-                    console.log(`Generated answer: ${answer}`);
+                    console.log(`✅ Generated answer: ${answer}`);
 
                     // Fill the input field with the answer
                     await inputContainer.locator('input').fill(answer);
+                }
 
-                    const textareaInputs = await page.locator('textarea').all();
-                    for (const textarea of textareaInputs) {
-                        const value = await getInputValueWithTimeout(textarea, 100);
-                        if (value == '') {
-                            const parentDiv = textarea.locator('xpath=..'); // Go to parent
-                            const label = parentDiv.locator('label'); // Find label inside the parent
-                            const question = await label.innerText();
-                            const errorMessage = '';
-                            const gptPrompt = question + " " + errorMessage;
-                            console.log(`❓ Gpt Prompt textarea : ${gptPrompt}`);
-                            const answer = await GetAnswer(gptPrompt);
-                            await textarea.fill(answer);
-                        }
+                // Loop through Inputs combobox
+                for (const container of await page.locator('div[data-test-single-typeahead-entity-form-component]').all()) {
+                    const inputElement = container.locator('input[role="combobox"]'); // Select only combobox inputs
+
+                    if (await inputElement.count() > 0) { // Ensure the input exists
+                        const labelElement = container.locator('label');
+                        const errorMessageElement = container.locator('span.artdeco-inline-feedback__message');
+
+                        // Extract question
+                        const question = await labelElement.innerText();
+
+                        // Check if there's an error message
+                        const errorMessage = (await errorMessageElement.count()) > 0 ? (await errorMessageElement.innerText()).trim() : "";
+
+                        console.log(`❓ Question: ${question}`);
+                        console.log(`⚠️ Error Message: ${errorMessage || "None"}`);
+
+                        // Generate an answer
+                        const gptPrompt = question + (errorMessage ? ` || Error: ${errorMessage}` : "");
+                        const answer = await GetAnswer(gptPrompt);
+                        const formattedAnswer = answer.trim().normalize("NFC");
+
+                        console.log(`✅ Generated Answer: ${formattedAnswer}`);
+
+                        // Fill the input field
+                        await inputElement.fill(formattedAnswer);
+                        await page.waitForTimeout(3000);
+
+                        // Press ArrowDown & Enter to select an autocomplete suggestion
+                        await inputElement.press('ArrowDown');
+                        await inputElement.press('Enter');
+
+                        console.log(`🎯 Successfully filled: ${formattedAnswer}`);
                     }
+                }
 
-                    // Find all fieldsets with radio buttons
-                    const fieldsets = await modal.locator('fieldset[data-test-form-builder-radio-button-form-component="true"]').all();
-
-                    for (const fieldset of fieldsets) {
-                        const yesOption = fieldset.locator(
-                            'input[type="radio"][value="Yes"], input[type="radio"][value="Oui"], ' +
-                            'input[data-test-text-selectable-option__input="Yes"], input[data-test-text-selectable-option__input="Oui"]'
-                        );
-
-                        if (await yesOption.isVisible()) {
-                            console.log("✅ Clicking 'Yes' option...");
-                            // await yesOption.check();
-                            await yesOption.dispatchEvent("click"); // Selects the "Yes" radio button
-                        } else {
-                            console.log("❌ 'Yes' option not found.");
-                        }
+                const textareaInputs = await page.locator('textarea').all();
+                for (const textarea of textareaInputs) {
+                    const value = await getInputValueWithTimeout(textarea, 100);
+                    if (value == '') {
+                        const parentDiv = textarea.locator('xpath=..'); // Go to parent
+                        const label = parentDiv.locator('label'); // Find label inside the parent
+                        const question = await label.innerText();
+                        const errorMessage = '';
+                        const gptPrompt = question + " " + errorMessage;
+                        console.log(`❓ Gpt Prompt textarea : ${gptPrompt}`);
+                        const answer = await GetAnswer(gptPrompt);
+                        await textarea.fill(answer);
                     }
+                }
 
-                    // Get all <select> elements
-                    const selectFields = await modal.locator('select').all();
+                // // Find all fieldsets with radio buttons
+                // const fieldsets = await modal.locator('fieldset[data-test-form-builder-radio-button-form-component="true"]').all();
+                // Locate all fieldsets
+                const fieldsets = await modal.locator('fieldset').all();
 
-                    // Store selects that'll need to be answered
-                    const unansweredSelects: any[] = [];
+                // Store valid fieldsets with radio buttons
+                const fieldsetData: { question: string; answers: string[]; fieldset: any }[] = [];
 
-                    // Store available options for each select (excluding the first one)
-                    const selectOptions: Record<string, string[]> = {};
+                for (const fieldset of fieldsets) {
+                    // Check if there are radio buttons inside the fieldset
+                    const radioButtons = fieldset.locator('input[type="radio"]');
 
-                    for (const select of selectFields) {
-                        const selectId = await select.getAttribute('id');
-                        if (!selectId) continue; // Skip if no ID found
-                        const options = await select.locator('option').allTextContents(); // Get all options text
-                        const firstOption = (await select.locator('option').first().textContent())?.trim() || "";
-                        const selectedOption = await select.inputValue(); // Get the currently selected value
+                    if (await radioButtons.count() > 0) {
+                        // Get the question from the legend tag
+                        const legend = fieldset.locator('legend');
+                        const question = (await legend.innerText()).trim();
 
-                        const labelLocator = page.locator(`label[for="${selectId}"]`);
-                        let question = '';
-                        if (await labelLocator.isVisible()) {
-                            // Extract the question text
-                            question = (await labelLocator.innerText()).trim();
-                            console.log(`❓ Question: ${question}`);
-                        } else {
-                            console.log(`❌ No label found for select with ID: ${selectId}`);
-                        }
-                        // If the selected option is the first option, it needs to be answered
-                        if (selectedOption === firstOption) {
-                            unansweredSelects.push(select);
+                        // Get all possible answers from the labels associated with the radio buttons
+                        const labels = await fieldset.locator('label').allTextContents();
+                        const answers = labels.map(label => label.trim());
 
-                            // Store all options except the first one (trimmed)
-                            const selectOptions = options.slice(1).map(opt => opt.trim()); // Remove first option
-                            let availableOptions = '';
+                        // Store the extracted data
+                        fieldsetData.push({ question, answers, fieldset });
+                    }
+                }
 
-                            selectOptions.forEach(opt => {
-                                // Assuming opt is a string or can be converted to a string
-                                availableOptions += opt.toString() + ' || ';
-                            });
+                console.log("🚀 Extracted Radio question Data:");
+                for (const { question, answers, fieldset } of fieldsetData) {
+                    const gptPrompt = question + " || only available answer, chose exactly one and do not modify or translate it: " + answers.join(', ');
 
-                            // Optionally, you can trim the last ' || ' if needed
-                            availableOptions = availableOptions.slice(0, -4); // Remove the last ' || '
+                    console.log(`❓ Gpt Prompt: ${gptPrompt}`);
 
-                            const gptPrompt = question + " the only answer available are :" + availableOptions;
-                            // console.log(`Gpt Prompt: ` + encodeURIComponent(gptPrompt));
-                            console.log(`Gpt Prompt: ` + gptPrompt);
+                    // Call AI to get an answer
+                    let answer = await GetAnswer(gptPrompt); // Await properly inside loop
 
-                            let answer = await GetAnswer(gptPrompt); // Await properly inside loop
+                    // ✅ Format the answer to remove unwanted characters
+                    answer = answer.trim().normalize("NFC");
 
-                            // Find the best matching option
-                            const matchingOption = await findClosestMatch(answer, selectOptions);
-                            await select.selectOption({ label: matchingOption });
+                    console.log(`Generated answer: ${answer}`);
 
-                            console.log(`Generated Select answer test: ` + answer);
+                    // Locate the corresponding radio input by value and select it
+                    const selectedRadio = await fieldset.locator(`input[type="radio"][value="${answer}"]`);
+                    await selectedRadio.dispatchEvent("click");
 
-                        }
+                }
+
+                // Get all <select> elements
+                const selectFields = await modal.locator('select').all();
+
+                // Store selects that'll need to be answered
+                const unansweredSelects: any[] = [];
+
+                // Store available options for each select (excluding the first one)
+                const selectOptions: Record<string, string[]> = {};
+
+                for (const select of selectFields) {
+                    const selectId = await select.getAttribute('id');
+                    if (!selectId) continue; // Skip if no ID found
+                    const options = await select.locator('option').allTextContents(); // Get all options text
+                    const firstOption = (await select.locator('option').first().textContent())?.trim() || "";
+                    const selectedOption = await select.inputValue(); // Get the currently selected value
+
+                    const labelLocator = page.locator(`label[for="${selectId}"]`);
+                    let question = '';
+                    if (await labelLocator.isVisible()) {
+                        // Extract the question text
+                        question = (await labelLocator.innerText()).trim();
+                    } else {
+                        console.log(`❌ No label found for select with ID: ${selectId}`);
+                    }
+                    // If the selected option is the first option, it needs to be answered
+                    if (selectedOption === firstOption) {
+                        unansweredSelects.push(select);
+
+                        // Store all options except the first one (trimmed)
+                        const selectOptions = options.slice(1).map(opt => opt.trim()); // Remove first option
+                        let availableOptions = '';
+
+                        selectOptions.forEach(opt => {
+                            // Assuming opt is a string or can be converted to a string
+                            availableOptions += opt.toString() + ' || ';
+                        });
+
+                        // Optionally, you can trim the last ' || ' if needed
+                        availableOptions = availableOptions.slice(0, -4); // Remove the last ' || '
+
+                        const gptPrompt = question + " the only answer available are :" + availableOptions;
+                        // console.log(`Gpt Prompt: ` + encodeURIComponent(gptPrompt));
+                        console.log(`❓ Gpt Prompt select : ` + gptPrompt);
+
+                        let answer = await GetAnswer(gptPrompt); // Await properly inside loop
+
+                        // Find the best matching option
+                        const matchingOption = await findClosestMatch(answer, selectOptions);
+                        await select.selectOption({ label: matchingOption });
+
+                        console.log(`✅ Generated Select answer : ` + answer);
 
                     }
 
                     console.log(`Unanswered selects: ${unansweredSelects.length}`);
                     console.log("Available select options (excluding first):", selectOptions);
-
                 }
+
+
 
 
                 if (nextStepButton) nextStepButton.click();
                 if (submitButton) submitButton.click();
                 if (verifButton) verifButton.click();
 
-                // const successText = await modal.locator('text="Votre candidature a été envoyée"').isVisible();
-
-                // if (successText) {
-                //     console.log("Candidature confirmation detected.");
-
-                //     // Locate the "Ignorer" button
-                //     const ignoreButton = modal.getByRole('button', { name: 'Ignorer', exact: true });
-
-                //     if (await ignoreButton.isVisible()) {
-                //         console.log("Clicking 'Ignorer' button...");
-                //         await ignoreButton.click();
-                //     } else {
-                //         console.log("'Ignorer' button not found.");
-                //     }
-                // }
 
 
                 tryCount++;
@@ -307,63 +348,4 @@ async function getInputValueWithTimeout(input: Locator, timeoutMs: number): Prom
         console.log(`Skipping input due to timeout (${timeoutMs}ms).`);
         return null;
     }
-}
-
-// // Function to call the Python script and get the answer
-// async function GetAnswer(question: string): Promise<string> {
-//     const prompt = `avec le CV ci-joint, ne donne QUE la réponse a cette question, un chiffre si c'est ce qui est demandé ou une reponse courte: ${question}`;
-
-//     try {
-//         const pythonProcess = spawn('python', ['gpt4free.py', prompt]);
-
-//         let response = '';
-
-//         // Collect data from the Python script
-//         pythonProcess.stdout.on('data', (data) => {
-//             response += data.toString();
-//         });
-
-//         // Handle errors from the Python script
-//         pythonProcess.stderr.on('data', (data) => {
-//             console.error(`Python Error: ${data}`);
-//         });
-
-//         // Wait for the Python process to exit
-//         await new Promise((resolve, reject) => {
-//             pythonProcess.on('close', (code) => {
-//                 if (code === 0) {
-//                     resolve(response);
-//                 } else {
-//                     reject(new Error(`Python process exited with code ${code}`));
-//                 }
-//             });
-//         });
-
-//         console.log(response);
-//         return response;
-
-//     } catch (error) {
-//         console.error("GPT Error:", error);
-//         return "An error occurred while processing your request.";
-//     }
-// }
-
-// Function to find the closest matching option
-function findClosestMatch(answer: string, options: string[]): string | undefined {
-    // Normalize text by removing accents, extra spaces, and special characters
-    const normalizeText = (text: string) =>
-        text
-            .normalize("NFD") // Decomposes characters (é -> é)
-            .replace(/[\u0300-\u036f]/g, "") // Removes accents
-            .replace(/[^\w\s]/g, "") // Removes non-word characters (e.g., special chars like �)
-            .trim()
-            .toLowerCase();
-
-    // Clean answer
-    const normalizedAnswer = normalizeText(answer);
-
-    console.log(`🔍 Normalized answer: ${normalizedAnswer}`);
-
-    // Find best matching option
-    return options.find(option => normalizeText(option).includes(normalizedAnswer));
 }

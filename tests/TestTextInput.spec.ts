@@ -1,12 +1,14 @@
 import { Locator, test } from '@playwright/test';
 import dotenv from 'dotenv';
 dotenv.config({ path: './.env' });
-import { spawn } from 'child_process';
 import GetAnswer from '../utils/GetAnswerFromPython.ts';
+import * as path from 'path';
 
 test('Fill all empty text inputs', async ({ page }) => {
-    await page.goto('file:///C:/Users/Michael/Documents/Linkedin%20Job%20AI/Linkedin-Auto-Job/inputsExample/textInput.html');
-    
+    const filePath = `file://${path.resolve(__dirname, '../inputsExample/textInput.html')}`;
+
+    await page.goto(filePath);
+
 
     // Get all <input> elements type text
     const inputContainers = await page.locator('div[data-test-single-line-text-form-component]').all();
@@ -23,7 +25,7 @@ test('Fill all empty text inputs', async ({ page }) => {
         const type = await inputElement.getAttribute('type'); // Get input type
 
         // Ensure all required elements exist and they are empty
-        if ((await labelElement.isVisible() && await inputElement.isVisible())&& (value == '' || (await spanElement.count()) > 0 ) && type != 'file') {
+        if ((await labelElement.isVisible() && await inputElement.isVisible()) && (value == '' || (await spanElement.count()) > 0) && type != 'file') {
             const question = (await labelElement.innerText()).trim();
             const errorMessage = (await spanElement.count()) > 0 ? (await spanElement.innerText()).trim() : "";
 

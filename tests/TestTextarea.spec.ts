@@ -1,9 +1,12 @@
 import { test, Locator } from '@playwright/test';
 import GetAnswer from '../utils/GetAnswerFromPython.ts';
+import * as path from 'path';
 
 
 test('test', async ({ page }) => {
-  await page.goto('file:///C:/Users/Michael/Documents/Linkedin%20Job%20AI/Linkedin-Auto-Job/inputsExample/textarea.html');
+    const filePath = `file://${path.resolve(__dirname, '../inputsExample/textInput.html')}`;
+
+    await page.goto(filePath);
 
   const textareaInputs = await page.locator('textarea').all();
   for (const textarea of textareaInputs) {

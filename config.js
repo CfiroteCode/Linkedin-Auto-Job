@@ -8,8 +8,8 @@ const config = {
       DISMISS: 'button[aria-label="Dismiss"]'
     }
   },JOBPARAMETERS:{
-    LOCATION :"florida",
-    JOB_SEARCH_KEYWORD :"developer"
+    LOCATION :"Mountain View, Californie, États-Unis",
+    JOB_SEARCH_KEYWORD :"QA remote"
   }
 };
 module.exports = config;
