@@ -3,7 +3,6 @@ import dotenv from 'dotenv';
 import config from '../config.js';
 import GetAnswer from '../utils/GetAnswerFromPython.ts';
 dotenv.config({ path: './.env' });
-import { spawn } from 'child_process';
 
 test('test', async ({ page }) => {
     await page.goto('https://www.linkedin.com/login/');
@@ -70,7 +69,7 @@ test('test', async ({ page }) => {
     const allLinks = await listContainer.locator('a.job-card-list__title--link').all();
     console.log(`Total job links collected: ${allLinks.length}`);
 
-    // Print all job links
+    // Print all job links, there is maximum 25 jobs by pages
     console.log([...allLinks]);
 
     for (const job of allLinks) {
@@ -90,7 +89,7 @@ test('test', async ({ page }) => {
             await page.$('button.jobs-apply-button');
             await easyApplyButton.click();
 
-            let maxTries = 25; // Prevent infinite loops, and there is maximum 25 jobs by pages
+            let maxTries = 25; // Prevent infinite loops
             let tryCount = 0;
 
             while (tryCount < maxTries) {
@@ -121,14 +120,17 @@ test('test', async ({ page }) => {
                 const verifButton = modal.getByLabel('Vérifiez votre candidature', { exact: true });
 
                 // Stop the loop when neither button is visible
-                if (!nextStepButton && !submitButton) {
-                    console.log("Both buttons are gone, exiting loop.");
+                if (!(await nextStepButton.isVisible()) && !(await submitButton.isVisible() && !(await verifButton.isVisible()))) {
+                    console.log("✅ No more steps or submit button, exiting loop.");
+                    const ignoreButton = page.getByRole('button', { name: 'Ignorer', exact: true });
+                    await ignoreButton.click();
                     break;
                 }
+
                 // Get all <input> elements type text
                 const inputContainers = await modal.locator('div[data-test-single-line-text-form-component]').all();
 
-                // Store the list of input fields with error messages
+                // Store the list of input fields or with with error messages
                 const Inputs: { question: string; errorMessage: string; inputContainer: Locator }[] = [];
 
                 for (const container of inputContainers) {
@@ -148,7 +150,7 @@ test('test', async ({ page }) => {
                     }
                 }
 
-                console.log("🚀 List of input fields empty:");
+                console.log("🚀 List of input fields empty or with errors:");
                 console.log(Inputs);
 
                 // Loop through Inputs
@@ -198,7 +200,7 @@ test('test', async ({ page }) => {
                     // Get all <select> elements
                     const selectFields = await modal.locator('select').all();
 
-                    // Store selects that need to be answered
+                    // Store selects that'll need to be answered
                     const unansweredSelects: any[] = [];
 
                     // Store available options for each select (excluding the first one)
@@ -212,7 +214,6 @@ test('test', async ({ page }) => {
                         const selectedOption = await select.inputValue(); // Get the currently selected value
 
                         const labelLocator = page.locator(`label[for="${selectId}"]`);
-
                         let question = '';
                         if (await labelLocator.isVisible()) {
                             // Extract the question text
@@ -221,7 +222,6 @@ test('test', async ({ page }) => {
                         } else {
                             console.log(`❌ No label found for select with ID: ${selectId}`);
                         }
-
                         // If the selected option is the first option, it needs to be answered
                         if (selectedOption === firstOption) {
                             unansweredSelects.push(select);
@@ -239,16 +239,16 @@ test('test', async ({ page }) => {
                             availableOptions = availableOptions.slice(0, -4); // Remove the last ' || '
 
                             const gptPrompt = question + " the only answer available are :" + availableOptions;
-                            console.log(`Gpt Prompt: ` + encodeURIComponent(gptPrompt));
+                            // console.log(`Gpt Prompt: ` + encodeURIComponent(gptPrompt));
+                            console.log(`Gpt Prompt: ` + gptPrompt);
 
-                            let answer = await GetAnswer(decodeURIComponent(gptPrompt)); // Await properly inside loop
-                            // answer = answer.slice(0, -5).trim().normalize("NFC");
+                            let answer = await GetAnswer(gptPrompt); // Await properly inside loop
 
                             // Find the best matching option
                             const matchingOption = await findClosestMatch(answer, selectOptions);
                             await select.selectOption({ label: matchingOption });
 
-                            console.log(`Generated Select answer test: ` + matchingOption);
+                            console.log(`Generated Select answer test: ` + answer);
 
                         }
 
@@ -257,30 +257,31 @@ test('test', async ({ page }) => {
                     console.log(`Unanswered selects: ${unansweredSelects.length}`);
                     console.log("Available select options (excluding first):", selectOptions);
 
-
-                    if (nextStepButton) nextStepButton.click();
-                    if (submitButton) submitButton.click();
-                    if (verifButton) verifButton.click();
-
-                    const successText = await modal.locator('text="Votre candidature a été envoyée"').isVisible();
-
-                    if (successText) {
-                        console.log("Candidature confirmation detected.");
-
-                        // Locate the "Ignorer" button
-                        const ignoreButton = modal.getByRole('button', { name: 'Ignorer', exact: true });
-
-                        if (await ignoreButton.isVisible()) {
-                            console.log("Clicking 'Ignorer' button...");
-                            await ignoreButton.click();
-                        } else {
-                            console.log("'Ignorer' button not found.");
-                        }
-                    }
-
-
-                    tryCount++;
                 }
+
+
+                if (nextStepButton) nextStepButton.click();
+                if (submitButton) submitButton.click();
+                if (verifButton) verifButton.click();
+
+                // const successText = await modal.locator('text="Votre candidature a été envoyée"').isVisible();
+
+                // if (successText) {
+                //     console.log("Candidature confirmation detected.");
+
+                //     // Locate the "Ignorer" button
+                //     const ignoreButton = modal.getByRole('button', { name: 'Ignorer', exact: true });
+
+                //     if (await ignoreButton.isVisible()) {
+                //         console.log("Clicking 'Ignorer' button...");
+                //         await ignoreButton.click();
+                //     } else {
+                //         console.log("'Ignorer' button not found.");
+                //     }
+                // }
+
+
+                tryCount++;
 
 
             }

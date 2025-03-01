@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 dotenv.config({ path: './.env' });
 import { spawn } from 'child_process';
 import findClosestMatch from '../utils/findClosestMatch.ts';
+import GetAnswer from '../utils/GetAnswerFromPython.ts';
 
 test('test', async ({ page }) => {
     await page.goto('file:///C:/Users/Michael/Documents/Linkedin%20Job%20AI/Linkedin-Auto-Job/inputsExample/select.html');
@@ -10,7 +11,7 @@ test('test', async ({ page }) => {
     // Get all <select> elements
     const selectFields = await page.locator('select').all();
 
-    // Store selects that need to be answered
+    // Store selects that'll need to be answered
     const unansweredSelects: any[] = [];
 
     // Store available options for each select (excluding the first one)
@@ -49,15 +50,16 @@ test('test', async ({ page }) => {
             availableOptions = availableOptions.slice(0, -4); // Remove the last ' || '
 
             const gptPrompt = question + " the only answer available are :" + availableOptions;
-            console.log(`Gpt Prompt: ` + encodeURIComponent(gptPrompt));
+            // console.log(`Gpt Prompt: ` + encodeURIComponent(gptPrompt));
+            console.log(`Gpt Prompt: ` + gptPrompt);
 
-            let answer = await getAnswerFromPython(decodeURIComponent(gptPrompt)); // Await properly inside loop
+            let answer = await GetAnswer(gptPrompt); // Await properly inside loop
 
             // Find the best matching option
             const matchingOption = await findClosestMatch(answer, selectOptions);
             await select.selectOption({ label: matchingOption });
 
-            console.log(`Generated Select answer test: ` + matchingOption);
+            console.log(`Generated Select answer test: ` + answer);
 
         }
 
@@ -65,59 +67,41 @@ test('test', async ({ page }) => {
 });
 
 // Function to call the Python script and get the answer
-async function getAnswerFromPython(question: string): Promise<string> {
-    const prompt = `avec le CV ci-joint, ne donne QUE la réponse a cette question, un chiffre si c'est ce qui est demandé ou une reponse courte: ${question}`;
+// async function getAnswerFromPython(question: string): Promise<string> {
+//     const prompt = `avec le CV ci-joint, ne donne QUE la réponse a cette question, un chiffre si c'est ce qui est demandé ou une reponse courte: ${question}`;
 
-    try {
-        const pythonProcess = spawn('python', ['gpt4free.py', prompt]);
+//     try {
+//         const pythonProcess = spawn('python', ['gpt4free.py', prompt]);
 
-        let response = '';
+//         let response = '';
 
-        // Collect data from the Python script
-        pythonProcess.stdout.on('data', (data) => {
-            response += data.toString();
-        });
+//         // Collect data from the Python script
+//         pythonProcess.stdout.on('data', (data) => {
+//             response += data.toString();
+//         });
 
-        // Handle errors from the Python script
-        pythonProcess.stderr.on('data', (data) => {
-            console.error(`Python Error: ${data}`);
-        });
+//         // Handle errors from the Python script
+//         pythonProcess.stderr.on('data', (data) => {
+//             console.error(`Python Error: ${data}`);
+//         });
 
-        // Wait for the Python process to exit
-        await new Promise((resolve, reject) => {
-            pythonProcess.on('close', (code) => {
-                if (code === 0) {
-                    resolve(response);
-                } else {
-                    reject(new Error(`Python process exited with code ${code}`));
-                }
-            });
-        });
+//         // Wait for the Python process to exit
+//         await new Promise((resolve, reject) => {
+//             pythonProcess.on('close', (code) => {
+//                 if (code === 0) {
+//                     resolve(response);
+//                 } else {
+//                     reject(new Error(`Python process exited with code ${code}`));
+//                 }
+//             });
+//         });
 
-        console.log(response);
-        return response;
+//         response= decodeURIComponent(response);
+//         console.log(response);
+//         return response;
 
-    } catch (error) {
-        console.error("GPT Error:", error);
-        return "An error occurred while processing your request.";
-    }
-}
-// Function to find the closest matching option
-// function findClosestMatch(answer: string, options: string[]): string | undefined {
-//     // Normalize text by removing accents, extra spaces, and special characters
-//     const normalizeText = (text: string) =>
-//         text
-//             .normalize("NFD") // Decomposes characters (é -> é)
-//             .replace(/[\u0300-\u036f]/g, "") // Removes accents
-//             .replace(/[^\w\s]/g, "") // Removes non-word characters (e.g., special chars like �)
-//             .trim()
-//             .toLowerCase();
-
-//     // Clean answer
-//     const normalizedAnswer = normalizeText(answer);
-
-//     console.log(`🔍 Normalized answer: ${normalizedAnswer}`);
-
-//     // Find best matching option
-//     return options.find(option => normalizeText(option).includes(normalizedAnswer));
+//     } catch (error) {
+//         console.error("GPT Error:", error);
+//         return "An error occurred while processing your request.";
+//     }
 // }

@@ -31,6 +31,7 @@ async function getAnswerFromPython(question: string): Promise<string> {
             });
         });
 
+        response= decodeURIComponent(response);
         console.log(response);
         return response;
 
